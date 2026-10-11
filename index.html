@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="refresh" content="300">
+<title>RLI Tracking Dashboard</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:#f8fafc; color:#1e293b; padding:20px; max-width:1100px; margin:0 auto }
+  h1 { font-size:22px; font-weight:700; margin-bottom:2px }
+  .subtitle { color:#64748b; font-size:13px; margin-bottom:20px }
+  .badge { color:#fff; padding:4px 12px; border-radius:4px; font-weight:700; font-size:13px; letter-spacing:0.5px }
+
+  /* Status bar */
+  .status-bar { display:flex; align-items:center; gap:16px; margin-bottom:20px; padding:14px 20px; background:#fff; border:1px solid #e2e8f0; border-radius:10px }
+  .status-bar .meta { font-size:12px; color:#94a3b8 }
+  .status-bar .last-check { font-size:14px; font-weight:600 }
+
+  /* Cards */
+  .card { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px; margin-bottom:14px }
+  .card h2 { font-size:14px; font-weight:600; color:#475569; margin-bottom:10px; text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:8px }
+  .card h2 .count { background:#e2e8f0; color:#475569; padding:2px 8px; border-radius:10px; font-size:12px }
+
+  /* Summary row */
+  .summary { display:flex; gap:12px; margin-bottom:14px }
+  .summary-item { flex:1; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px; text-align:center }
+  .summary-item .num { font-size:28px; font-weight:700 }
+  .summary-item .label { font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; margin-top:2px }
+  .summary-item.lead .num { color:#3b82f6 }
+  .summary-item.purchase .num { color:#22c55e }
+
+  /* Tables */
+  table { width:100%; border-collapse:collapse }
+  th, td { text-align:left; padding:7px 10px; border-bottom:1px solid #f1f5f9; font-size:13px }
+  th { color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; position:sticky; top:0; background:#fff }
+  td.ts { color:#94a3b8; font-size:12px; white-space:nowrap }
+  td.empty { text-align:center; color:#94a3b8; padding:20px; font-style:italic }
+  .table-wrap { max-height:400px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:8px }
+
+  /* Site badges */
+  .site-badge { padding:2px 6px; border-radius:3px; font-size:11px; font-weight:700; letter-spacing:0.5px }
+  .site-badge.rli { background:#dbeafe; color:#2563eb }
+  .site-badge.tr { background:#fce7f3; color:#be185d }
+  .site-badge.unknown { background:#fee2e2; color:#dc2626 }
+
+  /* AnyTrack badges */
+  .at-yes { background:#dcfce7; color:#16a34a; padding:2px 6px; border-radius:3px; font-size:11px; font-weight:600 }
+  .at-webhook { background:#fef3c7; color:#d97706; padding:2px 6px; border-radius:3px; font-size:11px; font-weight:600 }
+  .at-none { color:#94a3b8; font-size:11px }
+
+  /* Issues */
+  .issue { padding:8px 12px; border-left:3px solid; border-radius:0 6px 6px 0; margin-bottom:6px; font-size:13px }
+  .issue.info { border-left-color:#94a3b8; background:#fafafa; opacity:0.7 }
+  .all-clear { padding:14px; color:#22c55e; font-weight:600 }
+  .info-header { margin-top:10px; font-size:11px; color:#94a3b8; font-weight:600; text-transform:uppercase; letter-spacing:0.5px }
+  .sev-badge { padding:2px 6px; border-radius:3px; font-size:11px; font-weight:600; margin-right:6px }
+  .sev-badge.critical { background:#fee2e2; color:#dc2626 }
+  .sev-badge.warning { background:#fef3c7; color:#d97706 }
+  .sev-badge.info { background:#e0e7ff; color:#4f46e5 }
+
+  /* Snippet grid */
+  .snippet-grid { display:flex; flex-wrap:wrap; gap:8px }
+  .snippet-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; min-width:180px; flex:1 }
+  .snippet-site { font-size:11px; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:0.5px }
+  .snippet-id { font-weight:700; font-size:14px }
+  .snippet-id.ok::before { content:"\2022 "; color:#22c55e }
+  .snippet-id.bad::before { content:"\2022 "; color:#ef4444 }
+  .snippet-name { font-size:13px; color:#374151 }
+  .snippet-at { font-size:11px; margin-top:4px }
+  .snippet-at.at-ok { color:#16a34a }
+  .snippet-at.at-none { color:#94a3b8 }
+  .snippet-err { color:#ef4444; font-size:12px; margin-top:4px }
+
+  /* AnyTrack section */
+  .at-site { margin-bottom:12px; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0 }
+  .at-site-header { display:flex; align-items:center; gap:10px; margin-bottom:8px }
+  .at-site-label { font-weight:700; font-size:14px }
+  .at-tag { font-size:12px; padding:2px 8px; border-radius:4px }
+  .at-tag.ok { background:#dcfce7; color:#16a34a }
+  .at-tag.bad { background:#fee2e2; color:#dc2626 }
+  .at-snippets { font-size:12px }
+  .at-snippet { padding:3px 0; display:flex; align-items:center; gap:8px }
+  .at-snip-name { color:#475569; font-weight:500 }
+  .at-ok { color:#16a34a; font-weight:600 }
+  .at-webhook { color:#d97706 }
+  .at-none { color:#94a3b8 }
+
+  /* Bump badge */
+  .bump { background:#f3e8ff; color:#7c3aed; padding:1px 5px; border-radius:3px; font-size:11px }
+
+  /* Tabs */
+  .tabs { display:flex; gap:0; margin-bottom:-1px; position:relative; z-index:1 }
+  .tab { padding:8px 16px; font-size:13px; font-weight:600; color:#64748b; cursor:pointer; border:1px solid transparent; border-bottom:none; border-radius:8px 8px 0 0; background:transparent }
+  .tab.active { color:#1e293b; background:#fff; border-color:#e2e8f0 }
+  .tab-content { display:none }
+  .tab-content.active { display:block }
+
+  /* Refresh button */
+  .refresh-btn { background:#3b82f6; color:#fff; border:none; padding:6px 14px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; margin-left:auto }
+  .refresh-btn:hover { background:#2563eb }
+  .refresh-btn:disabled { background:#94a3b8; cursor:wait }
+  .refresh-status { font-size:11px; color:#94a3b8; margin-left:8px }
+
+  /* Live indicator */
+  .live-dot { width:8px; height:8px; background:#22c55e; border-radius:50%; display:inline-block; margin-right:4px; animation:pulse 2s infinite }
+  @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.4 } }
+
+  /* Row highlight for fresh data */
+  .fresh-row { background:#f0fdf4 }
+
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:14px }
+  @media (max-width:768px) { .grid-2 { grid-template-columns:1fr } }
+</style>
+</head>
+<body>
+
+<h1>RLI + TR Tracking Dashboard</h1>
+<div class="subtitle">
+  Monitor data from last check &middot; Generated 2026-10-11 02:12 UTC
+  <span id="live-status" style="display:none;margin-left:8px"><span class="live-dot"></span><span id="live-label">Live</span></span>
+</div>
+
+<!-- Status bar -->
+<div class="status-bar">
+  <span class="badge" style="background:#ef4444">CRITICAL</span>
+  <div>
+    <div class="last-check">Last monitor run: 2026-10-11T02:12:59</div>
+    <div class="meta">Dashboard generated: 2026-10-11 02:12 UTC</div>
+  </div>
+  <button class="refresh-btn" onclick="refreshLive()" id="refresh-btn">Refresh Live</button>
+  <span class="refresh-status" id="refresh-status"></span>
+</div>
+
+<!-- Summary -->
+<div class="summary">
+  <div class="summary-item lead">
+    <div class="num" id="lead-count">100</div>
+    <div class="label">Leads (2h)</div>
+  </div>
+  <div class="summary-item purchase">
+    <div class="num" id="purchase-count">4</div>
+    <div class="label">Purchases (2h)</div>
+  </div>
+</div>
+
+<!-- Lead Events -->
+<div class="card">
+  <h2>Leads <span class="count" id="lead-count-badge">100</span></h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Time</th><th>Site</th><th>Email</th><th>Page</th><th>AnyTrack</th></tr></thead>
+      <tbody id="lead-table">
+        <tr>
+          <td class="ts">2026-10-11 02:11:58</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="smlee8180@gmail.com">smlee8180@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 02:11:23</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="laurenmarinavarro1@gmail.com">laurenmarinavarro1@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 02:10:51</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="mosaiclizzy@icloud.com">mosaiclizzy@icloud.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 02:10:03</td>
+          <td><span class="site-badge unknown">??</span></td>
+          <td title="kthomp714@gmail.com">kthomp714@gmail.com</td>
+          <td title=""></td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 02:08:13</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="mhmarx@gmail.com">mhmarx@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 02:07:39</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="himlaperou@hotmail.com">himlaperou@hotmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 02:07:33</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="deborah.a.koch@gmail.com">deborah.a.koch@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 02:07:05</td>
+          <td><span class="site-badge unknown">??</span></td>
+          <td title="arockermann@aol.com">arockermann@aol.com</td>
+          <td title=""></td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 02:07:04</td>
+          <td><span class="site-badge unknown">??</span></td>
+          <td title="arockermann@aol.com">arockermann@aol.com</td>
+          <td title="The Summit VIP Pass Tripwire Page (new design)">The Summit VIP Pass Tripwire Page (...</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 02:04:51</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="mbalan@nymcs.ca">mbalan@nymcs.ca</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 02:04:38</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="bccarlvad@gmail.com">bccarlvad@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 02:03:19</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="mirandaj@gmail.com">mirandaj@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 02:00:49</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="eljeraar@gmail.com">eljeraar@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 02:00:36</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="brucknermchristine@gmail.com">brucknermchristine@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:59:27</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="julie@julieschmitcounseling.com">julie@julieschmitcounseling.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:58:37</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="cecilia.baca.rdh@gmail.com">cecilia.baca.rdh@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:58:17</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="lvjm7983@yahoo.com">lvjm7983@yahoo.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:57:11</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="carolsquire11@gmail.com">carolsquire11@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:54:20</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="79juniperridge@gmail.com">79juniperridge@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:53:56</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="castrorojas.sofia@gmail.com">castrorojas.sofia@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:48:59</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="helen@thecourageousman.com.au">helen@thecourageousman.com.au</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:48:50</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="cmlcsw@yahoo.com">cmlcsw@yahoo.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:48:40</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="mary@groveemotionalhealth.com">mary@groveemotionalhealth.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:44:35</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="emolloy57@gmail.com">emolloy57@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:44:16</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="1hikinggal@gmail.com">1hikinggal@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:44:00</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="lshainbaum@gmail.com">lshainbaum@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:43:16</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="brookecorry@gmail.com">brookecorry@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:43:10</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="levydebra@gmail.com">levydebra@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:42:20</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="d.blackstone@verizon.net">d.blackstone@verizon.net</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:39:52</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="swilson@hotchkiss.org">swilson@hotchkiss.org</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:38:02</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="vkalinkoxskalinko@gmail.com">vkalinkoxskalinko@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:37:08</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="suecatesmft@gmail.com">suecatesmft@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:35:07</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="brennanfoidart@gmail.com">brennanfoidart@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:34:56</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="shaktistmichael@gmail.com">shaktistmichael@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:31:59</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="vetkarenschreiber@gmail.com">vetkarenschreiber@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:31:44</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="mannei@aol.com">mannei@aol.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:31:12</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="rtbulkley@msn.com">rtbulkley@msn.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:29:42</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="archan@charter.net">archan@charter.net</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:28:32</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="unglb@yahoo.com">unglb@yahoo.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:28:28</td>
+          <td><span class="site-badge unknown">??</span></td>
+          <td title="eli1315@outlook.com">eli1315@outlook.com</td>
+          <td title=""></td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:28:27</td>
+          <td><span class="site-badge unknown">??</span></td>
+          <td title="eli1315@outlook.com">eli1315@outlook.com</td>
+          <td title="The Summit VIP Pass Tripwire Page (new design)">The Summit VIP Pass Tripwire Page (...</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:28:02</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="den_cyn@sbcglobal.net">den_cyn@sbcglobal.net</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:27:56</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="teacherkh@aol.com">teacherkh@aol.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:27:32</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="peter_ceci4@yahoo.com">peter_ceci4@yahoo.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:27:23</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="op2800275@gmail.com">op2800275@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:26:56</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="kathryn@wesslingphd.com">kathryn@wesslingphd.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:22:27</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="debmaccabee@gmail.com">debmaccabee@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:21:58</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="katielacroix4@gmail.com">katielacroix4@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:20:13</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="nreichmann@spiiglass.com">nreichmann@spiiglass.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:20:00</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="franceswright@sympatico.ca">franceswright@sympatico.ca</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:19:15</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="modavidson116@gmail.com">modavidson116@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:17:46</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="heatkin@hotmail.com">heatkin@hotmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:17:43</td>
+          <td><span class="site-badge unknown">??</span></td>
+          <td title="justiciabg@hotmail.com">justiciabg@hotmail.com</td>
+          <td title=""></td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:17:42</td>
+          <td><span class="site-badge unknown">??</span></td>
+          <td title="justiciabg@hotmail.com">justiciabg@hotmail.com</td>
+          <td title="The Summit VIP Pass Tripwire Page (new design)">The Summit VIP Pass Tripwire Page (...</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:17:21</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="is8tar@gmail.com">is8tar@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:14:54</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="cjclark77@outlook.com">cjclark77@outlook.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:13:54</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="dhaarnab@gmail.com">dhaarnab@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:13:42</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="sunjudy61@yahoo.com">sunjudy61@yahoo.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:13:35</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="damiendaintry@gmail.com">damiendaintry@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:13:17</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="tvm@meravan.com.au">tvm@meravan.com.au</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:13:10</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="francescacarrollsmall@gmail.com">francescacarrollsmall@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:12:57</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="huwchristopher@gmail.com">huwchristopher@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:12:16</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="bluesky23@mac.com">bluesky23@mac.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:12:07</td>
+          <td><span class="site-badge rli">RLI</span></td>
+          <td title="doceastin@gmail.com">doceastin@gmail.com</td>
+          <td title="Guide_Confirmed">Guide_Confirmed</td>
+          <td><span class="at-yes">AT</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:12:06</td>
+          <td><span class="site-badge rli">RLI</span></td>
+          <td title="doceastin@gmail.com">doceastin@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-yes">AT</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:12:03</td>
+          <td><span class="site-badge rli">RLI</span></td>
+          <td title="doceastin@gmail.com">doceastin@gmail.com</td>
+          <td title="Guide | Confirmed">Guide | Confirmed</td>
+          <td><span class="at-yes">AT</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:12:03</td>
+          <td><span class="site-badge rli">RLI</span></td>
+          <td title="doceastin@gmail.com">doceastin@gmail.com</td>
+          <td title=""></td>
+          <td><span class="at-yes">AT</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:11:59</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="emmaquish@gmail.com">emmaquish@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:11:49</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="sdellen@comcast.net">sdellen@comcast.net</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:10:34</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="nicola.a.bewley@gmail.com">nicola.a.bewley@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:06:58</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="yuliagarbuzov@gmail.com">yuliagarbuzov@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:06:06</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="yogaesse@gmail.com">yogaesse@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:05:56</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="colordesigntexture@hotmail.com">colordesigntexture@hotmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:05:01</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="betharooks@gmail.com">betharooks@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:04:51</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="holistictherapynyc@gmail.com">holistictherapynyc@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:04:26</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="kathleen.m.killen@gmail.com">kathleen.m.killen@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:03:35</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="carollazarus642@gmail.com">carollazarus642@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:02:45</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="parabiz82@gmail.com">parabiz82@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:01:31</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="ciaraheff+terryreal@hotmail.com">ciaraheff+terryreal@hotmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 01:00:31</td>
+          <td><span class="site-badge unknown">??</span></td>
+          <td title="benrain@peak.org">benrain@peak.org</td>
+          <td title=""></td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:59:17</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="ggottl@aol.com">ggottl@aol.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:56:21</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="elizabeth.24.eh@gmail.com">elizabeth.24.eh@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:56:18</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="steve.belay@outlook.com">steve.belay@outlook.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:55:45</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="jnro.psychotherapist@gmail.com">jnro.psychotherapist@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:55:35</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="herrma25@gmail.com">herrma25@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:55:25</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="michelle.gorzek@gmail.com">michelle.gorzek@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:54:13</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="paulina.etzold@gmail.com">paulina.etzold@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:53:38</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="siennasteiner@gmail.com">siennasteiner@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:53:17</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="scarpman@mac.com">scarpman@mac.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:53:16</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="lavhall@laviniahall.com">lavhall@laviniahall.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:52:13</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="elisasarah79@yahoo.com.au">elisasarah79@yahoo.com.au</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:51:42</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="grettaharris@yahoo.com.au">grettaharris@yahoo.com.au</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:51:21</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="shauntaewillis@gmail.com">shauntaewillis@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:50:57</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="jmcmicking@yahoo.com.au">jmcmicking@yahoo.com.au</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:50:48</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="eschwarzschild@gmail.com">eschwarzschild@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:50:08</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="chrissyrlarson@gmail.com">chrissyrlarson@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:46:35</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="revboffice@aol.com">revboffice@aol.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:46:06</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="sylvie3355@gmail.com">sylvie3355@gmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:45:35</td>
+          <td><span class="site-badge tr">TR</span></td>
+          <td title="frostha@hotmail.com">frostha@hotmail.com</td>
+          <td title="ontraport_smartform">ontraport_smartform</td>
+          <td><span class="at-webhook">webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:45:11</td>
+          <td><span class="site-badge unknown">??</span></td>
+          <td title="mitravis.74@gmail.com">mitravis.74@gmail.com</td>
+          <td title=""></td>
+          <td>—</td>
+        </tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Purchase Events -->
+<div class="card">
+  <h2>Purchases <span class="count" id="purchase-count-badge">4</span></h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Time</th><th>Site</th><th>Email</th><th>Product</th><th>Price</th><th>Order</th><th>AnyTrack</th></tr></thead>
+      <tbody id="purchase-table">
+        <tr>
+          <td class="ts">2026-10-11 01:13:12</td>
+          <td><span class="site-badge rli">RLI</span></td>
+          <td title="jonas.eberle@gmail.com">jonas.eberle@gmail.com</td>
+          <td>US Workshop course</td>
+          <td>—</td>
+          <td>43736763</td>
+          <td><span class="at-webhook">TC webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:58:47</td>
+          <td><span class="site-badge rli">RLI</span></td>
+          <td title="info@aandjfarm.com">info@aandjfarm.com</td>
+          <td>The Art of Relational Living</td>
+          <td>—</td>
+          <td>43736670</td>
+          <td><span class="at-webhook">TC webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:43:46</td>
+          <td><span class="site-badge rli">RLI</span></td>
+          <td title="jkcortese@gmail.com">jkcortese@gmail.com</td>
+          <td>The Confidently Handle Couples on the Brink of Disaster Workshop</td>
+          <td>—</td>
+          <td>43736578</td>
+          <td><span class="at-webhook">TC webhook</span></td>
+        </tr>
+        <tr>
+          <td class="ts">2026-10-11 00:33:16</td>
+          <td><span class="site-badge rli">RLI</span></td>
+          <td title="christinea303@gmail.com">christinea303@gmail.com</td>
+          <td>Relationship Summit - VIP Pass Worldwide</td>
+          <td>—</td>
+          <td>43736520</td>
+          <td><span class="at-webhook">TC webhook</span></td>
+        </tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Issues + Snippets side by side -->
+<div class="grid-2">
+  <div class="card">
+    <h2>Issues</h2>
+    <div class="issue" style="border-left-color:#ef4444;background:#ef444411"><span class="sev-badge critical">CRITICAL</span> 7/100 Lead events missing `page` in last 2h</div><div class="issue" style="border-left-color:#f59e0b;background:#f59e0b11"><span class="sev-badge warning">WARNING</span> Unknown site value &#x27;summit.terryreal.com&#x27; in Lead event</div><div class="issue" style="border-left-color:#ef4444;background:#ef444411"><span class="sev-badge critical">CRITICAL</span> Cannot read snippet #55587 (Guide/Cert Tracking) on RLI</div><div class="issue" style="border-left-color:#ef4444;background:#ef444411"><span class="sev-badge critical">CRITICAL</span> Cannot read snippet #56948 (Universal Tracker) on RLI</div><div class="issue" style="border-left-color:#ef4444;background:#ef444411"><span class="sev-badge critical">CRITICAL</span> Cannot read snippet #56949 (Fluent Form Tracker) on RLI</div><div class="issue" style="border-left-color:#ef4444;background:#ef444411"><span class="sev-badge critical">CRITICAL</span> Cannot read snippet #57438 (Elementor Form Tracker) on RLI</div><div class="issue" style="border-left-color:#ef4444;background:#ef444411"><span class="sev-badge critical">CRITICAL</span> Cannot read snippet #42980 (Universal Tracker) on TR</div><div class="issue" style="border-left-color:#ef4444;background:#ef444411"><span class="sev-badge critical">CRITICAL</span> Cannot read snippet #42981 (Elementor Form Tracker) on TR</div><div class="info-header">Informational</div><div class="issue info"><span class="sev-badge info">INFO</span> 2/100 Lead events missing `site` in last 2h (snippets verified green — likely cached pages aging out)</div>
+  </div>
+  <div class="card">
+    <h2>AnyTrack Health</h2>
+    
+        <div class="at-site">
+          <div class="at-site-header">
+            <span class="at-site-label">RLI</span>
+            <span class="at-tag bad">Site-wide tag: MISSING (via snippet)</span>
+          </div>
+          <div class="at-snippets"></div>
+        </div>
+        <div class="at-site">
+          <div class="at-site-header">
+            <span class="at-site-label">TR</span>
+            <span class="at-tag ok">Site-wide tag: loaded (via GTM)</span>
+          </div>
+          <div class="at-snippets"></div>
+        </div>
+  </div>
+</div>
+
+<!-- Snippet Integrity -->
+<div class="card">
+  <h2>Snippet Integrity</h2>
+  <div class="snippet-grid">
+        <div class="snippet-card">
+          <div class="snippet-site"></div>
+          <div class="snippet-id bad">#55587</div>
+          <div class="snippet-name">Guide/Cert Tracking</div>
+          
+          <div class="snippet-err">read failed</div>
+        </div>
+        <div class="snippet-card">
+          <div class="snippet-site"></div>
+          <div class="snippet-id bad">#56948</div>
+          <div class="snippet-name">Universal Tracker</div>
+          
+          <div class="snippet-err">read failed</div>
+        </div>
+        <div class="snippet-card">
+          <div class="snippet-site"></div>
+          <div class="snippet-id bad">#56949</div>
+          <div class="snippet-name">Fluent Form Tracker</div>
+          
+          <div class="snippet-err">read failed</div>
+        </div>
+        <div class="snippet-card">
+          <div class="snippet-site"></div>
+          <div class="snippet-id bad">#57438</div>
+          <div class="snippet-name">Elementor Form Tracker</div>
+          
+          <div class="snippet-err">read failed</div>
+        </div>
+        <div class="snippet-card">
+          <div class="snippet-site"></div>
+          <div class="snippet-id bad">#42980</div>
+          <div class="snippet-name">Universal Tracker</div>
+          
+          <div class="snippet-err">read failed</div>
+        </div>
+        <div class="snippet-card">
+          <div class="snippet-site"></div>
+          <div class="snippet-id bad">#42981</div>
+          <div class="snippet-name">Elementor Form Tracker</div>
+          
+          <div class="snippet-err">read failed</div>
+        </div></div>
+</div>
+
+<div style="text-align:center;margin-top:20px;font-size:12px;color:#94a3b8">
+  Powered by <a href="https://github.com/relationallifetherapy/rli-tracking-monitor" style="color:#3b82f6">rli-tracking-monitor</a>
+  &middot; Monitor runs every 15 min via GitHub Actions
+  &middot; Live refresh via proxy
+</div>
+
+<!-- Client-side real-time refresh via WP proxy (no API key exposed) -->
+<script>
+const PROXY = "https://relationallife.com/wp-json/rli/v1/posthog-events";
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+function siteBadge(site) {
+  if (site === 'relationallife.com') return '<span class="site-badge rli">RLI</span>';
+  if (site === 'terryreal.com') return '<span class="site-badge tr">TR</span>';
+  return site ? '<span class="site-badge unknown">??</span>' : '<span class="site-badge unknown">??</span>';
+}
+
+function atBadgeLead(site) {
+  if (site === 'relationallife.com') return '<span class="at-yes">AT</span>';
+  if (site === 'terryreal.com') return '<span class="at-webhook">webhook</span>';
+  return '\u2014';
+}
+
+async function fetchEvents(eventName, hours) {
+  const params = new URLSearchParams({ event: eventName, hours: hours, limit: 50 });
+  const resp = await fetch(`${PROXY}?${params}`);
+  if (!resp.ok) throw new Error(`Proxy ${resp.status}`);
+  const data = await resp.json();
+  return data.results || [];
+}
+
+function renderLeadRow(ev) {
+  const ts = (ev.timestamp || '').slice(0, 19).replace('T', ' ');
+  const email = esc(ev.email || '\u2014');
+  const page = esc((ev.page || '\u2014').slice(0, 35));
+  return `<tr class="fresh-row">
+    <td class="ts">${ts}</td>
+    <td>${siteBadge(ev.site)}</td>
+    <td>${email}</td>
+    <td>${page}</td>
+    <td>${atBadgeLead(ev.site)}</td>
+  </tr>`;
+}
+
+function renderPurchaseRow(ev) {
+  const ts = (ev.timestamp || '').slice(0, 19).replace('T', ' ');
+  const email = esc(ev.email || '\u2014');
+  const product = esc(ev.product_name || '\u2014');
+  const price = ev.product_price || '';
+  const orderId = esc(ev.order_id || '\u2014');
+  const bump = ev.bump_name ? ` <span class="bump">+${esc(ev.bump_name)}</span>` : '';
+  return `<tr class="fresh-row">
+    <td class="ts">${ts}</td>
+    <td>${siteBadge(ev.site)}</td>
+    <td>${email}</td>
+    <td>${product}${bump}</td>
+    <td>${price ? '$' + price : '\u2014'}</td>
+    <td>${orderId}</td>
+    <td><span class="at-webhook">TC webhook</span></td>
+  </tr>`;
+}
+
+async function refreshLive() {
+  const btn = document.getElementById('refresh-btn');
+  const status = document.getElementById('refresh-status');
+  const liveStatus = document.getElementById('live-status');
+
+  btn.disabled = true;
+  btn.textContent = 'Refreshing...';
+  status.textContent = '';
+
+  try {
+    const [leads, purchases] = await Promise.all([
+      fetchEvents('Lead', 2),
+      fetchEvents('Purchase', 2),
+    ]);
+
+    // Update lead table
+    const leadTable = document.getElementById('lead-table');
+    if (leads.length > 0) {
+      leadTable.innerHTML = leads.map(renderLeadRow).join('');
+    } else {
+      leadTable.innerHTML = '<tr><td colspan="5" class="empty">No Lead events in last 2h</td></tr>';
+    }
+
+    // Update purchase table
+    const purchaseTable = document.getElementById('purchase-table');
+    if (purchases.length > 0) {
+      purchaseTable.innerHTML = purchases.map(renderPurchaseRow).join('');
+    } else {
+      purchaseTable.innerHTML = '<tr><td colspan="7" class="empty">No Purchase events in last 2h</td></tr>';
+    }
+
+    // Update counts
+    document.getElementById('lead-count').textContent = leads.length;
+    document.getElementById('purchase-count').textContent = purchases.length;
+    document.getElementById('lead-count-badge').textContent = leads.length;
+    document.getElementById('purchase-count-badge').textContent = purchases.length;
+
+    const now = new Date().toLocaleTimeString();
+    status.textContent = `Updated ${now}`;
+    liveStatus.style.display = 'inline';
+    document.getElementById('live-label').textContent = `Live (${now})`;
+
+  } catch (e) {
+    status.textContent = `Error: ${e.message}`;
+    console.error('Refresh failed:', e);
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Refresh Live';
+}
+
+// Auto-refresh on page load
+refreshLive();
+// And every 60 seconds
+setInterval(refreshLive, 60000);
+</script>
+
+</body>
+</html>
